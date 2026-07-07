@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Analog VLC Data Link</title>
+    <style>
+        :root { --bg-color: #0b141a; --panel-bg: #111b21; --card-bg: #202c33; --text-main: #e9edef; --text-muted: #8696a0; --accent: #00a884; --accent-hover: #008f6f; --danger: #ef9a9a; --border: #2a3942; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 800px; background: var(--panel-bg); border-radius: 12px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); overflow: hidden; border: 1px solid var(--border); }
+        .header { text-align: center; padding: 20px; border-bottom: 1px solid var(--border); background: var(--card-bg); position: relative; }
+        .header h1 { margin: 0; color: var(--accent); font-size: 24px; font-weight: 600; }
+        .header p { margin: 5px 0 0 0; color: var(--text-muted); font-size: 14px; }
+        .tabs { display: flex; border-bottom: 1px solid var(--border); }
+        .tab { flex: 1; text-align: center; padding: 15px; cursor: pointer; color: var(--text-muted); font-weight: 600; transition: all 0.2s; }
+        .tab:hover { background: rgba(255, 255, 255, 0.05); }
+        .tab.active { color: var(--accent); border-bottom: 3px solid var(--accent); background: rgba(0, 168, 132, 0.05); }
+        .panel { display: none; padding: 25px; }
+        .panel.active { display: block; }
+        .control-group { background: var(--card-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .btn { background: var(--accent); color: var(--bg-color); border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:hover { background: var(--accent-hover); }
+        .btn:disabled { background: #334; color: #667; cursor: not-allowed; }
+        .btn-outline { background: transparent; color: var(--text-main); border: 1px solid var(--border); }
+        .btn-outline:hover { background: rgba(255, 255, 255, 0.1); }
+        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; background: #2a3942; color: var(--text-muted); font-size: 12px; font-weight: bold; margin-left: 15px; }
+        .file-input-wrapper { margin: 20px 0; }
+        input[type="file"] { display: block; width: 100%; padding: 10px; background: var(--bg-color); border: 1px dashed var(--border); border-radius: 6px; color: var(--text-main); cursor: pointer; }
+        .progress-text { margin-top: 15px; color: var(--accent); font-weight: 500; font-size: 15px; }
+        .console-wrapper { margin-top: 20px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .console-header { background: var(--card-bg); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: bold; }
+        .console { background: var(--bg-color); padding: 15px; height: 250px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
+        .hidden { display: none; }
+        audio { width: 100%; height: 40px; margin-top: 15px; border-radius: 6px; outline: none; }
+        audio::-webkit-media-controls-panel { background-color: var(--card-bg); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Analog VLC Data Link</h1>
+            <p>True Analog Audio Transfer over Optical Link (DAC to ADC)</p>
+        </div>
+
+        <div class="tabs">
+            <div id="tab-tx" class="tab active">Transmitter (TX)</div>
+            <div id="tab-rx" class="tab">Receiver (RX)</div>
+        </div>
+
+        <div id="panel-tx" class="panel active">
+            <div class="control-group">
+                <button class="btn" id="btn-conn-tx">Connect TX ESP32</button>
+                <span class="status-badge" id="status-tx">Status: Disconnected</span>
+
+                <div class="file-input-wrapper">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select audio file to stream (converted to 8kHz 8-bit Raw PCM):</label>
+                    <input type="file" id="file-input" accept="audio/*">
+                </div>
+
+                <button class="btn" id="btn-stream" disabled style="width: 100%;">Start Analog Stream</button>
+                <div class="progress-text" id="stream-progress">Ready.</div>
+            </div>
+        </div>
+
+        <div id="panel-rx" class="panel hidden">
+            <div class="control-group">
+                <button class="btn" id="btn-conn-rx">Connect RX ESP32</button>
+                <span class="status-badge" id="status-rx">Status: Disconnected</span>
+
+                <div style="margin-top: 20px; text-align: center;">
+                    <h3 style="color: var(--text-muted); margin-bottom: 10px;">Receiver Status</h3>
+                    <div class="progress-text" id="rx-buffer-status" style="font-size: 18px;">Standby...</div>
+                </div>
+
+                <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    <button class="btn" id="btn-start-rx" disabled>Start Recording ADC</button>
+                    <button class="btn btn-outline" id="btn-stop-rx" disabled style="margin-left: 10px;">Stop & Download WAV</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 0 25px 25px 25px;">
+            <div class="console-wrapper">
+                <div class="console-header">
+                    <span>System Logs</span>
+                    <button class="btn btn-outline" id="btn-clear-logs" style="padding: 4px 8px; font-size: 11px;">Clear</button>
+                </div>
+                <div class="console" id="console"></div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="audio-script.js"></script>
+</body>
+</html>
