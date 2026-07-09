@@ -112,7 +112,9 @@ class TransferManager {
             const pcmData = new Uint8Array(length);
             const channels = renderedBuffer.getChannelData(0);
             for(let i = 0; i < length; i++) {
-                let sample = Math.max(-1, Math.min(1, channels[i]));
+                // Boost the volume by 500% to FORCE the laser to swing between 0 and 255!
+                let sample = channels[i] * 5.0; 
+                sample = Math.max(-1, Math.min(1, sample)); // Hard clip to max limits
                 pcmData[i] = Math.round((sample + 1) * 127.5);
             }
             

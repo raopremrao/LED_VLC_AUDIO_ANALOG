@@ -3,12 +3,11 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
-#include <driver/dac.h>
 
 #define SERVICE_UUID           "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 #define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
-const int DAC_PIN = 25;
+const int LASER_PIN = 2; // Using Pin 2 with PWM (since we know it works perfectly!)
 const int SAMPLE_RATE = 8000;
 
 hw_timer_t * timer = NULL;
@@ -28,9 +27,9 @@ void IRAM_ATTR onTimer() {
     if (isPlaying && head != tail) {
         uint8_t sample = audioBuf[tail];
         tail = (tail + 1) % BUF_SIZE;
-        dacWrite(DAC_PIN, sample);
+        ledcWrite(LASER_PIN, sample);
     } else {
-        dacWrite(DAC_PIN, IDLE_BIAS);
+        ledcWrite(LASER_PIN, IDLE_BIAS);
     }
     portEXIT_CRITICAL_ISR(&timerMux);
 }
@@ -83,10 +82,12 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
     Serial.println("====================================");
-    Serial.println("[INFO] Booting Analog VLC_TX (DAC Pin 25)...");
+    Serial.println("[INFO] Booting Analog VLC_TX (PWM on Pin 2)...");
     
-    // Enable DAC and set to idle bias
-    dacWrite(DAC_PIN, IDLE_BIAS);
+    // Setup PWM on the laser pin (ESP32 Core v3.0+ API)
+    // 10 kHz frequency: Slow enough for generic transistors to handle, but just barely fast enough to carry 8kHz audio!
+    ledcAttach(LASER_PIN, 10000, 8);
+    ledcWrite(LASER_PIN, IDLE_BIAS);
 
     BLEDevice::init("VLC_TX_Analog");
     BLEDevice::setMTU(512);
@@ -106,11 +107,10 @@ void setup() {
     pServer->getAdvertising()->start();
     Serial.println("[INFO] BLE Advertising...");
 
-    // Setup 8kHz Timer Interrupt
-    timer = timerBegin(0, 80, true); // 1MHz base clock
-    timerAttachInterrupt(timer, &onTimer, true);
-    timerAlarmWrite(timer, 1000000 / SAMPLE_RATE, true);
-    timerAlarmEnable(timer);
+    // Setup 8kHz Timer Interrupt (ESP32 Core v3.0+)
+    timer = timerBegin(1000000); // 1MHz base clock
+    timerAttachInterrupt(timer, &onTimer);
+    timerAlarm(timer, 1000000 / SAMPLE_RATE, true, 0);
 }
 
 void loop() {

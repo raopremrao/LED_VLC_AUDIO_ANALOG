@@ -105,10 +105,9 @@ void setup() {
     pServer->getAdvertising()->start();
     Serial.println("[INFO] BLE Advertising...");
 
-    timer = timerBegin(0, 80, true);
-    timerAttachInterrupt(timer, &onTimer, true);
-    timerAlarmWrite(timer, 1000000 / SAMPLE_RATE, true);
-    timerAlarmEnable(timer);
+    timer = timerBegin(1000000); // 1MHz base clock
+    timerAttachInterrupt(timer, &onTimer);
+    timerAlarm(timer, 1000000 / SAMPLE_RATE, true, 0);
 }
 
 void loop() {
