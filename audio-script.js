@@ -91,7 +91,7 @@ class TransferManager {
         const file = document.getElementById('file-input').files[0];
         if (!file) return;
 
-        Logger.info('TX', `Processing audio: ${file.name}. Converting to 8kHz 8-bit RAW PCM...`);
+        Logger.info('TX', `Processing audio: ${file.name}. Converting to 2kHz 8-bit RAW PCM...`);
         document.getElementById('btn-stream').disabled = true;
 
         try {
@@ -99,7 +99,7 @@ class TransferManager {
             const arrayBuffer = await file.arrayBuffer();
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
             
-            const offlineCtx = new OfflineAudioContext(1, (audioBuffer.duration * 8000) + 1, 8000);
+            const offlineCtx = new OfflineAudioContext(1, (audioBuffer.duration * 2000) + 1, 2000);
             const source = offlineCtx.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(offlineCtx.destination);
@@ -180,7 +180,7 @@ class TransferManager {
         
         Logger.info('RX', `Recording complete. Total: ${Utils.formatBytes(this.rxRawPCM.length)}`);
         if (this.rxRawPCM.length > 0) {
-            const wavData = this.wrapWav(this.rxRawPCM, 8000);
+            const wavData = this.wrapWav(this.rxRawPCM, 2000); // Create 2000 Hz WAV file
             const blob = new Blob([wavData], { type: 'audio/wav' });
             Utils.downloadBlob(blob, 'analog_rx_recording.wav');
             Logger.info('RX', 'WAV file downloaded.');

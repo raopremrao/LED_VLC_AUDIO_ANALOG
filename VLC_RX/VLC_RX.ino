@@ -9,16 +9,17 @@
 #define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
 const int ADC_PIN = 34;
-const int SAMPLE_RATE = 8000;
+const int SAMPLE_RATE = 2000; // Slowed down from 8000 to 2000 Hz!
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
-#define BUF_SIZE 16384
-volatile uint8_t audioBuf[BUF_SIZE];
+#define BUF_SIZE 6000 // 3 seconds of audio at 2kHz
+uint8_t audioBuf[BUF_SIZE];
 volatile uint32_t head = 0;
-volatile uint32_t tail = 0;
+uint32_t tail = 0;
 volatile bool isRecording = false;
+bool isSending = false;
 
 BLECharacteristic *pTxCharacteristic;
 volatile bool deviceConnected = false;
@@ -31,10 +32,13 @@ void IRAM_ATTR onTimer() {
     uint8_t sample = adcVal >> 4;
 
     portENTER_CRITICAL_ISR(&timerMux);
-    uint32_t nextHead = (head + 1) % BUF_SIZE;
-    if (nextHead != tail) {
+    if (head < BUF_SIZE) {
         audioBuf[head] = sample;
-        head = nextHead;
+        head++;
+        if (head >= BUF_SIZE) {
+            isRecording = false; // Stop recording when buffer is full (3 seconds)
+            isSending = true;    // Trigger slow BLE transmission
+        }
     }
     portEXIT_CRITICAL_ISR(&timerMux);
 }
@@ -47,6 +51,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
     void onDisconnect(BLEServer* pServer) {
         deviceConnected = false;
         isRecording = false;
+        isSending = false;
         Serial.println("[WARN] Browser Disconnected");
         BLEDevice::startAdvertising();
     }
@@ -62,9 +67,12 @@ class MyRxCallbacks: public BLECharacteristicCallbacks {
             Serial.println("[CMD] " + cmdStr);
             if (cmdStr == "CMD:START") {
                 portENTER_CRITICAL(&timerMux);
-                head = 0; tail = 0;
-                portEXIT_CRITICAL(&timerMux);
+                head = 0;
+                tail = 0;
+                isSending = false;
                 isRecording = true;
+                portEXIT_CRITICAL(&timerMux);
+                Serial.println("[INFO] Started 3-second Analog Recording...");
             }
             if (cmdStr == "CMD:STOP") {
                 isRecording = false;
@@ -111,35 +119,27 @@ void setup() {
 }
 
 void loop() {
-    if (deviceConnected && isRecording) {
-        uint32_t currentHead, currentTail;
-        portENTER_CRITICAL(&timerMux);
-        currentHead = head;
-        currentTail = tail;
-        portEXIT_CRITICAL(&timerMux);
-
-        uint32_t available = (currentHead >= currentTail) ? 
-                             (currentHead - currentTail) : 
-                             (BUF_SIZE - currentTail + currentHead);
+    if (deviceConnected && isSending) {
+        uint32_t remaining = head - tail;
         
-        // Push in chunks of 240 bytes (30ms at 8kHz)
-        if (available >= 240) {
+        if (remaining > 0) {
+            uint32_t chunkSize = (remaining > 240) ? 240 : remaining;
             uint8_t txBuf[240];
-            for (int i = 0; i < 240; i++) {
-                txBuf[i] = audioBuf[currentTail];
-                currentTail = (currentTail + 1) % BUF_SIZE;
-            }
             
-            portENTER_CRITICAL(&timerMux);
-            tail = currentTail;
-            portEXIT_CRITICAL(&timerMux);
+            for (uint32_t i = 0; i < chunkSize; i++) {
+                txBuf[i] = audioBuf[tail + i];
+            }
+            tail += chunkSize;
 
-            pTxCharacteristic->setValue(txBuf, 240);
+            pTxCharacteristic->setValue(txBuf, chunkSize);
             pTxCharacteristic->notify();
             
-            delay(15); // Pace BLE to prevent stack congestion
+            // Slow down BLE transmission so Linux/Windows Bluetooth stack doesn't drop packets
+            delay(40); 
         } else {
-            delay(5); // Wait for more samples
+            // Finished sending the 3-second snippet
+            isSending = false;
+            Serial.println("[INFO] Sent 3-second recording to Browser.");
         }
     } else {
         delay(100);

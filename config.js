@@ -6,8 +6,8 @@ export const CONFIG = {
         MAX_MTU: 512,
     },
     TRANSFER: {
-        CHUNK_SIZE: 240, // 30ms of audio at 8000Hz 8-bit
-        BASE_TX_DELAY_MS: 30, // Pacing delay to match 8000Hz real-time
+        CHUNK_SIZE: 60, // 30ms of audio at 2000Hz 8-bit
+        BASE_TX_DELAY_MS: 30, // Pacing delay to match 2000Hz real-time
         MAX_WRITE_QUEUE: 5,
         MAX_RETRIES: 2,
     },

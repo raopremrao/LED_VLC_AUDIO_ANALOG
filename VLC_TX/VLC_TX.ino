@@ -8,12 +8,12 @@
 #define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
 const int LASER_PIN = 2; // Using Pin 2 with PWM (since we know it works perfectly!)
-const int SAMPLE_RATE = 8000;
+const int SAMPLE_RATE = 2000; // Slowed down from 8000 to 2000 Hz!
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
-#define BUF_SIZE 16384 // 2 seconds of audio at 8kHz
+#define BUF_SIZE 16384 // Large buffer for slower speed
 volatile uint8_t audioBuf[BUF_SIZE];
 volatile uint32_t head = 0;
 volatile uint32_t tail = 0;
@@ -85,8 +85,8 @@ void setup() {
     Serial.println("[INFO] Booting Analog VLC_TX (PWM on Pin 2)...");
     
     // Setup PWM on the laser pin (ESP32 Core v3.0+ API)
-    // 10 kHz frequency: Slow enough for generic transistors to handle, but just barely fast enough to carry 8kHz audio!
-    ledcAttach(LASER_PIN, 10000, 8);
+    // 4 kHz frequency: Incredibly slow and safe for ANY basic transistor to switch!
+    ledcAttach(LASER_PIN, 4000, 8);
     ledcWrite(LASER_PIN, IDLE_BIAS);
 
     BLEDevice::init("VLC_TX_Analog");
@@ -107,7 +107,7 @@ void setup() {
     pServer->getAdvertising()->start();
     Serial.println("[INFO] BLE Advertising...");
 
-    // Setup 8kHz Timer Interrupt (ESP32 Core v3.0+)
+    // Setup 2kHz Timer Interrupt (ESP32 Core v3.0+)
     timer = timerBegin(1000000); // 1MHz base clock
     timerAttachInterrupt(timer, &onTimer);
     timerAlarm(timer, 1000000 / SAMPLE_RATE, true, 0);
