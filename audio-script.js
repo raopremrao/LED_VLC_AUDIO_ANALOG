@@ -99,7 +99,7 @@ class TransferManager {
             const arrayBuffer = await file.arrayBuffer();
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
             
-            const offlineCtx = new OfflineAudioContext(1, (audioBuffer.duration * 4000) + 1, 4000);
+            const offlineCtx = new OfflineAudioContext(1, (audioBuffer.duration * 8000) + 1, 8000);
             const source = offlineCtx.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(offlineCtx.destination);
@@ -107,13 +107,13 @@ class TransferManager {
             
             const renderedBuffer = await offlineCtx.startRendering();
             
-            // Convert to 8-bit Unsigned PCM
-            const length = renderedBuffer.length;
+            // Manually downsample from 8000 Hz to 4000 Hz by taking every 2nd sample
+            const length = Math.floor(renderedBuffer.length / 2);
             const pcmData = new Uint8Array(length);
             const channels = renderedBuffer.getChannelData(0);
             for(let i = 0; i < length; i++) {
                 // Boost the volume by 500% to FORCE the laser to swing between 0 and 255!
-                let sample = channels[i] * 5.0; 
+                let sample = channels[i * 2] * 5.0; 
                 sample = Math.max(-1, Math.min(1, sample)); // Hard clip to max limits
                 pcmData[i] = Math.round((sample + 1) * 127.5);
             }
