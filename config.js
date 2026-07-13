@@ -7,7 +7,7 @@ export const CONFIG = {
     },
     TRANSFER: {
         CHUNK_SIZE: 120, // 30ms of audio at 4000Hz 8-bit
-        BASE_TX_DELAY_MS: 30, // Pacing delay to match 4000Hz real-time
+        BASE_TX_DELAY_MS: 10, // Send data faster than 30ms so the ESP32 buffer stays full!
         MAX_WRITE_QUEUE: 5,
         MAX_RETRIES: 2,
     },
