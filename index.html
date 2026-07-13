@@ -63,8 +63,9 @@
                     
                     <label style="display:block; margin-top: 10px; color:var(--text-muted); font-size:14px;">Audio Sample Rate (Speed):</label>
                     <select id="tx-setting-sample-rate" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
-                        <option value="2000">2000 Hz (Lowest Quality, Very Safe)</option>
-                        <option value="4000" selected>4000 Hz (Standard Walkie-Talkie)</option>
+                        <option value="1000" selected>1000 Hz (Ultra-Slow, Safest for basic transistors)</option>
+                        <option value="2000">2000 Hz (Low Quality, Safe)</option>
+                        <option value="4000">4000 Hz (Standard Walkie-Talkie)</option>
                         <option value="8000">8000 Hz (High Quality, Fast Transistor Needed)</option>
                     </select>
 
@@ -103,8 +104,9 @@
                     <h3 style="color: var(--primary); margin-top: 0; font-size: 16px;">Receiver Tuning</h3>
                     <label style="display:block; margin-top: 10px; color:var(--text-muted); font-size:14px;">Audio Sample Rate (Must match TX!):</label>
                     <select id="rx-setting-sample-rate" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
+                        <option value="1000" selected>1000 Hz</option>
                         <option value="2000">2000 Hz</option>
-                        <option value="4000" selected>4000 Hz</option>
+                        <option value="4000">4000 Hz</option>
                         <option value="8000">8000 Hz</option>
                     </select>
                 </div>

@@ -8,7 +8,7 @@ const char* password = "Hello World";
 WebSocketsServer webSocket = WebSocketsServer(81);
 
 const int ADC_PIN = 34;
-const int SAMPLE_RATE = 4000;
+const int SAMPLE_RATE = 1000; // Ultra-slow 1kHz default — matches TX
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;

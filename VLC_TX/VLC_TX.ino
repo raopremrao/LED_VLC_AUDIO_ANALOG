@@ -7,8 +7,8 @@
 #define SERVICE_UUID           "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 #define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
-const int LASER_PIN = 2; // Using Pin 2 with PWM (since we know it works perfectly!)
-const int SAMPLE_RATE = 4000; // Slowed down so standard transistors survive!
+const int LASER_PIN = 2;
+const int SAMPLE_RATE = 1000; // Ultra-slow 1kHz default — transistor-safe!
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -70,8 +70,11 @@ class MyRxCallbacks: public BLECharacteristicCallbacks {
             if (cmdStr.startsWith("CMD:RATE:")) {
                 int rate = cmdStr.substring(9).toInt();
                 if (rate > 0) {
+                    // Update audio playback timer
                     timerAlarm(timer, 1000000 / rate, true, 0);
-                    Serial.printf("[INFO] Hardware Timer Speed updated to %d Hz!\n", rate);
+                    // Update PWM carrier to 2x the audio rate
+                    ledcChangeFrequency(LASER_PIN, rate * 2, 8);
+                    Serial.printf("[INFO] Audio=%dHz, PWM Carrier=%dHz\n", rate, rate * 2);
                 }
             }
             return;
@@ -96,9 +99,8 @@ void setup() {
     Serial.println("====================================");
     Serial.println("[INFO] Booting Analog VLC_TX (PWM on Pin 2)...");
     
-    // Setup PWM on the laser pin (ESP32 Core v3.0+ API)
-    // 8 kHz frequency to give the slow transistor time to switch
-    ledcAttach(LASER_PIN, 8000, 8);
+    // Setup PWM on the laser pin — ultra-slow 2kHz carrier for basic transistors
+    ledcAttach(LASER_PIN, 2000, 8);
     ledcWrite(LASER_PIN, IDLE_BIAS);
 
     BLEDevice::init("VLC_TX_Analog");

@@ -160,7 +160,7 @@ class TransferManager {
         const rateEl = document.getElementById('tx-setting-sample-rate');
         CONFIG.TRANSFER.CHUNK_SIZE = chunkEl ? parseInt(chunkEl.value) : 120;
         CONFIG.TRANSFER.BASE_TX_DELAY_MS = delayEl ? parseInt(delayEl.value) : 10;
-        const targetRate = rateEl ? parseInt(rateEl.value) : 4000;
+        const targetRate = rateEl ? parseInt(rateEl.value) : 1000;
         
         // Process audio RIGHT NOW with the CURRENT dropdown settings
         try {
