@@ -1,12 +1,11 @@
 #include <Arduino.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <WiFi.h>
+#include <WebSocketsServer.h>
 
-#define SERVICE_UUID           "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-#define CHARACTERISTIC_UUID_TX "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
-#define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+const char* ssid = "Valar Morghulis";
+const char* password = "Hello World";
+
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 const int ADC_PIN = 34;
 const int SAMPLE_RATE = 4000;
@@ -14,134 +13,124 @@ const int SAMPLE_RATE = 4000;
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
-#define BUF_SIZE 12000 // 3 seconds of audio at 4kHz
+#define BUF_SIZE 16000 // Circular buffer
 uint8_t audioBuf[BUF_SIZE];
 volatile uint32_t head = 0;
 uint32_t tail = 0;
 volatile bool isRecording = false;
-bool isSending = false;
-
-BLECharacteristic *pTxCharacteristic;
-volatile bool deviceConnected = false;
+uint8_t connectedClientId = 255;
 
 void IRAM_ATTR onTimer() {
     if (!isRecording) return;
     
-    // Read 12-bit ADC and shift down to 8-bit for BLE streaming
-    uint16_t adcVal = analogRead(ADC_PIN);
+    // Read ADC 4 times and average it to drastically reduce background static/hiss!
+    uint32_t sum = 0;
+    for (int i = 0; i < 4; i++) {
+        sum += analogRead(ADC_PIN);
+    }
+    uint16_t adcVal = sum / 4;
+    
+    // Shift 12-bit down to 8-bit
     uint8_t sample = adcVal >> 4;
 
     portENTER_CRITICAL_ISR(&timerMux);
-    if (head < BUF_SIZE) {
+    uint32_t nextHead = (head + 1) % BUF_SIZE;
+    if (nextHead != tail) { // If not full
         audioBuf[head] = sample;
-        head++;
-        if (head >= BUF_SIZE) {
-            isRecording = false; // Stop recording when buffer is full (3 seconds)
-            isSending = true;    // Trigger slow BLE transmission
-        }
+        head = nextHead;
     }
     portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-        deviceConnected = true;
-        Serial.println("[INFO] Browser Connected to Analog RX");
-    }
-    void onDisconnect(BLEServer* pServer) {
-        deviceConnected = false;
-        isRecording = false;
-        isSending = false;
-        Serial.println("[WARN] Browser Disconnected");
-        BLEDevice::startAdvertising();
-    }
-};
-
-class MyRxCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
-        uint8_t* rxData = pCharacteristic->getData();
-        size_t rxLength = pCharacteristic->getLength();
-        
-        if (rxLength > 4 && strncmp((const char*)rxData, "CMD:", 4) == 0) {
-            String cmdStr = String((const char*)rxData).substring(0, rxLength);
-            Serial.println("[CMD] " + cmdStr);
-            if (cmdStr == "CMD:START") {
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+    switch(type) {
+        case WStype_DISCONNECTED:
+            Serial.printf("[%u] Disconnected!\n", num);
+            isRecording = false;
+            connectedClientId = 255;
+            break;
+        case WStype_CONNECTED:
+            {
+                IPAddress ip = webSocket.remoteIP(num);
+                Serial.printf("[%u] Connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+                connectedClientId = num;
+            }
+            break;
+        case WStype_TEXT:
+            if (strncmp((const char*)payload, "CMD:START", 9) == 0) {
                 portENTER_CRITICAL(&timerMux);
                 head = 0;
                 tail = 0;
-                isSending = false;
                 isRecording = true;
                 portEXIT_CRITICAL(&timerMux);
-                Serial.println("[INFO] Started 3-second Analog Recording...");
+                Serial.println("[INFO] Started continuous Wi-Fi streaming.");
             }
-            if (cmdStr == "CMD:STOP") {
+            else if (strncmp((const char*)payload, "CMD:STOP", 8) == 0) {
                 isRecording = false;
+                Serial.println("[INFO] Stopped Wi-Fi streaming.");
             }
-        }
+            break;
+        case WStype_BIN:
+            break;
     }
-};
+}
 
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    Serial.println("====================================");
-    Serial.println("[INFO] Booting Analog VLC_RX (ADC Pin 34)...");
-
-    analogReadResolution(12);
-
-    BLEDevice::init("VLC_RX_Analog");
-    BLEDevice::setMTU(512);
-
-    BLEServer *pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks());
-
-    BLEService *pService = pServer->createService(SERVICE_UUID);
     
-    pTxCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID_TX,
-        BLECharacteristic::PROPERTY_NOTIFY
-    );
-    pTxCharacteristic->addDescriptor(new BLE2902());
+    Serial.println();
+    Serial.print("[INFO] Connecting to WiFi: ");
+    Serial.println(ssid);
 
-    BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID_RX,
-        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR
-    );
-    pRxCharacteristic->setCallbacks(new MyRxCallbacks());
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
 
-    pService->start();
-    pServer->getAdvertising()->start();
-    Serial.println("[INFO] BLE Advertising...");
+    Serial.println("");
+    Serial.println("[INFO] WiFi connected successfully!");
+    Serial.print("[INFO] ESP32 IP Address: ");
+    Serial.println(WiFi.localIP());
+    Serial.println("[INFO] Enter this IP in the Web App to connect!");
 
-    timer = timerBegin(1000000); // 1MHz base clock
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+    
+    // Setup 4kHz Timer Interrupt
+    timer = timerBegin(1000000); 
     timerAttachInterrupt(timer, &onTimer);
     timerAlarm(timer, 1000000 / SAMPLE_RATE, true, 0);
 }
 
 void loop() {
-    if (deviceConnected && isSending) {
-        uint32_t remaining = head - tail;
-        
-        if (remaining > 0) {
-            uint32_t chunkSize = (remaining > 240) ? 240 : remaining;
-            uint8_t txBuf[240];
-            
-            for (uint32_t i = 0; i < chunkSize; i++) {
-                txBuf[i] = audioBuf[tail + i];
-            }
-            tail += chunkSize;
+    webSocket.loop();
+    
+    if (isRecording && connectedClientId != 255) {
+        uint32_t currentHead, currentTail;
+        portENTER_CRITICAL(&timerMux);
+        currentHead = head;
+        currentTail = tail;
+        portEXIT_CRITICAL(&timerMux);
 
-            pTxCharacteristic->setValue(txBuf, chunkSize);
-            pTxCharacteristic->notify();
+        uint32_t available = (currentHead >= currentTail) ? 
+                             (currentHead - currentTail) : 
+                             (BUF_SIZE - currentTail + currentHead);
+                             
+        // Send chunks of audio data when we have enough
+        if (available >= 256) {
+            uint8_t txBuf[256];
+            for (int i = 0; i < 256; i++) {
+                txBuf[i] = audioBuf[currentTail];
+                currentTail = (currentTail + 1) % BUF_SIZE;
+            }
             
-            // Slow down BLE transmission so Linux/Windows Bluetooth stack doesn't drop packets
-            delay(40); 
-        } else {
-            // Finished sending the 3-second snippet
-            isSending = false;
-            Serial.println("[INFO] Sent 3-second recording to Browser.");
+            portENTER_CRITICAL(&timerMux);
+            tail = currentTail;
+            portEXIT_CRITICAL(&timerMux);
+
+            webSocket.sendBIN(connectedClientId, txBuf, 256);
         }
-    } else {
-        delay(100);
     }
 }

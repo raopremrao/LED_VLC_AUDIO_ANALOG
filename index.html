@@ -65,8 +65,11 @@
 
         <div id="panel-rx" class="panel hidden">
             <div class="control-group">
-                <button class="btn" id="btn-conn-rx">Connect RX ESP32</button>
                 <span class="status-badge" id="status-rx">Status: Disconnected</span>
+                <div style="margin: 15px 0;">
+                    <input type="text" id="rx-ip-input" placeholder="RX ESP32 IP (e.g. 192.168.1.10)" style="width: 100%; padding: 10px; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #444;">
+                    <button class="btn" id="btn-conn-rx" style="width: 100%;">Connect RX via WiFi</button>
+                </div>
 
                 <div style="margin-top: 20px; text-align: center;">
                     <h3 style="color: var(--text-muted); margin-bottom: 10px;">Receiver Status</h3>

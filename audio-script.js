@@ -63,27 +63,49 @@ class TransferManager {
     }
 
     async connectRX() {
-        Logger.info('RX', 'Connecting to RX ESP32...');
-        this.rxBle.onDisconnected = () => {
-            this.updateUI('status-rx', 'Status: Disconnected');
-            document.getElementById('btn-conn-rx').disabled = false;
-            document.getElementById('btn-start-rx').disabled = true;
-            document.getElementById('btn-stop-rx').disabled = true;
-        };
-        this.rxBle.onDataReceived = (data) => {
-            if (this.isRecording) {
-                const newArr = new Uint8Array(this.rxRawPCM.length + data.length);
-                newArr.set(this.rxRawPCM);
-                newArr.set(data, this.rxRawPCM.length);
-                this.rxRawPCM = newArr;
-                this.updateUI('rx-buffer-status', `Recorded: ${Utils.formatBytes(this.rxRawPCM.length)}`);
-            }
-        };
-        const connected = await this.rxBle.connect();
-        if (connected) {
-            this.updateUI('status-rx', 'Status: Connected');
-            document.getElementById('btn-conn-rx').disabled = true;
-            document.getElementById('btn-start-rx').disabled = false;
+        const ip = document.getElementById('rx-ip-input').value.trim();
+        if (!ip) {
+            alert("Please enter the RX ESP32 IP address exactly as shown in the Serial Monitor!");
+            return;
+        }
+        
+        Logger.info('RX', `Connecting to WebSocket at ws://${ip}:81/...`);
+        try {
+            this.rxSocket = new WebSocket(`ws://${ip}:81/`);
+            this.rxSocket.binaryType = "arraybuffer";
+
+            this.rxSocket.onopen = () => {
+                this.updateUI('status-rx', 'Status: Connected via WiFi');
+                document.getElementById('btn-conn-rx').disabled = true;
+                document.getElementById('btn-start-rx').disabled = false;
+                Logger.info('RX', 'Connected to WebSocket server.');
+            };
+
+            this.rxSocket.onclose = () => {
+                this.updateUI('status-rx', 'Status: Disconnected');
+                document.getElementById('btn-conn-rx').disabled = false;
+                document.getElementById('btn-start-rx').disabled = true;
+                document.getElementById('btn-stop-rx').disabled = true;
+                Logger.info('RX', 'WebSocket disconnected.');
+                if (this.isRecording) this.stopRxRecording();
+            };
+
+            this.rxSocket.onerror = (error) => {
+                Logger.error('RX', 'WebSocket Connection Error.');
+            };
+
+            this.rxSocket.onmessage = (event) => {
+                if (this.isRecording) {
+                    const data = new Uint8Array(event.data);
+                    const newArr = new Uint8Array(this.rxRawPCM.length + data.length);
+                    newArr.set(this.rxRawPCM);
+                    newArr.set(data, this.rxRawPCM.length);
+                    this.rxRawPCM = newArr;
+                    this.updateUI('rx-buffer-status', `Recorded: ${Utils.formatBytes(this.rxRawPCM.length)}`);
+                }
+            };
+        } catch (e) {
+            Logger.error('RX', `Connection failed: ${e.message}`);
         }
     }
 
@@ -112,9 +134,9 @@ class TransferManager {
             const pcmData = new Uint8Array(length);
             const channels = renderedBuffer.getChannelData(0);
             for(let i = 0; i < length; i++) {
-                // Boost the volume by 500% to FORCE the laser to swing between 0 and 255!
-                let sample = channels[i * 2] * 5.0; 
-                sample = Math.max(-1, Math.min(1, sample)); // Hard clip to max limits
+                // Boost the volume slightly (150%) but avoid the massive 500% clipping distortion!
+                let sample = channels[i * 2] * 1.5; 
+                sample = Math.max(-1, Math.min(1, sample)); // Soft clip
                 pcmData[i] = Math.round((sample + 1) * 127.5);
             }
             
@@ -167,22 +189,26 @@ class TransferManager {
         document.getElementById('btn-start-rx').disabled = true;
         document.getElementById('btn-stop-rx').disabled = false;
         this.updateUI('rx-buffer-status', `Recording Started...`);
-        Logger.info('RX', 'Sending CMD:START to Receiver...');
-        await this.rxBle.txCharacteristic.writeValueWithoutResponse(new TextEncoder().encode("CMD:START"));
+        Logger.info('RX', 'Sending CMD:START to Receiver via WiFi...');
+        if (this.rxSocket && this.rxSocket.readyState === WebSocket.OPEN) {
+            this.rxSocket.send("CMD:START");
+        }
     }
 
     async stopRxRecording() {
         this.isRecording = false;
         document.getElementById('btn-stop-rx').disabled = true;
         document.getElementById('btn-start-rx').disabled = false;
-        Logger.info('RX', 'Sending CMD:STOP to Receiver...');
-        await this.rxBle.txCharacteristic.writeValueWithoutResponse(new TextEncoder().encode("CMD:STOP"));
+        Logger.info('RX', 'Sending CMD:STOP to Receiver via WiFi...');
+        if (this.rxSocket && this.rxSocket.readyState === WebSocket.OPEN) {
+            this.rxSocket.send("CMD:STOP");
+        }
         
         Logger.info('RX', `Recording complete. Total: ${Utils.formatBytes(this.rxRawPCM.length)}`);
         if (this.rxRawPCM.length > 0) {
             const wavData = this.wrapWav(this.rxRawPCM, 4000); // Create 4000 Hz WAV file
             const blob = new Blob([wavData], { type: 'audio/wav' });
-            Utils.downloadBlob(blob, 'analog_rx_recording.wav');
+            Utils.downloadBlob(blob, 'analog_rx_continuous.wav');
             Logger.info('RX', 'WAV file downloaded.');
         }
     }
