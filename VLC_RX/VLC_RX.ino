@@ -8,7 +8,7 @@ const char* password = "Hello World";
 WebSocketsServer webSocket = WebSocketsServer(81);
 
 const int ADC_PIN = 34;
-const int SAMPLE_RATE = 8000; // Restored to full 8000 Hz!
+const int SAMPLE_RATE = 4000;
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -23,12 +23,8 @@ uint8_t connectedClientId = 255;
 void IRAM_ATTR onTimer() {
     if (!isRecording) return;
     
-    // Read ADC 4 times and average it to drastically reduce background static/hiss!
-    uint32_t sum = 0;
-    for (int i = 0; i < 4; i++) {
-        sum += analogRead(ADC_PIN);
-    }
-    uint16_t adcVal = sum / 4;
+    // Read ADC once. (We removed the 4x oversampling loop because it takes too long inside an ISR and crashes the ESP32!)
+    uint16_t adcVal = analogRead(ADC_PIN);
     
     // Shift 12-bit down to 8-bit
     uint8_t sample = adcVal >> 4;
