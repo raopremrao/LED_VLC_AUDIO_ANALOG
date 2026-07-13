@@ -51,13 +51,18 @@ class MyRxCallbacks: public BLECharacteristicCallbacks {
         size_t rxLength = pCharacteristic->getLength();
         
         if (rxLength > 4 && strncmp((const char*)rxData, "CMD:", 4) == 0) {
-            String cmdStr = String((const char*)rxData).substring(0, rxLength);
+            // Safely create a null-terminated copy of the command string
+            char cmdBuf[64];
+            size_t copyLen = (rxLength < 63) ? rxLength : 63;
+            memcpy(cmdBuf, rxData, copyLen);
+            cmdBuf[copyLen] = '\0';
+            String cmdStr = String(cmdBuf);
             Serial.println("[CMD] " + cmdStr);
             if (cmdStr == "CMD:START") {
                 portENTER_CRITICAL(&timerMux);
                 head = 0; tail = 0;
-                portEXIT_CRITICAL(&timerMux);
                 isPlaying = true;
+                portEXIT_CRITICAL(&timerMux);
             }
             if (cmdStr == "CMD:STOP") {
                 isPlaying = false;

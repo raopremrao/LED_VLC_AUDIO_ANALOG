@@ -58,7 +58,7 @@ class TransferManager {
         if (connected) {
             this.updateUI('status-tx', 'Status: Connected');
             document.getElementById('btn-conn-tx').disabled = true;
-            if (this.fileBuffer) document.getElementById('btn-stream').disabled = false;
+            if (this.rawAudioFile) document.getElementById('btn-stream').disabled = false;
         }
     }
 
@@ -112,52 +112,63 @@ class TransferManager {
     async handleFileSelect() {
         const file = document.getElementById('file-input').files[0];
         if (!file) return;
-
-        const targetRate = parseInt(document.getElementById('tx-setting-sample-rate').value);
-        Logger.info('TX', `Processing audio: ${file.name}. Converting to ${targetRate/1000}kHz 8-bit RAW PCM...`);
-        document.getElementById('btn-stream').disabled = true;
-
-        try {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const arrayBuffer = await file.arrayBuffer();
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-            
-            // Render at 8000 Hz to satisfy the browser API limits
-            const offlineCtx = new OfflineAudioContext(1, (audioBuffer.duration * 8000) + 1, 8000);
-            const source = offlineCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(offlineCtx.destination);
-            source.start();
-            
-            const renderedBuffer = await offlineCtx.startRendering();
-            
-            // Manually downsample to targetRate by taking every Nth sample
-            const step = Math.floor(8000 / targetRate);
-            const length = Math.floor(renderedBuffer.length / step);
-            const pcmData = new Uint8Array(length);
-            const channels = renderedBuffer.getChannelData(0);
-            for(let i = 0; i < length; i++) {
-                let sample = channels[i * step] * 1.5; 
-                sample = Math.max(-1, Math.min(1, sample)); // Soft clip
-                pcmData[i] = Math.round((sample + 1) * 127.5);
-            }
-            
-            this.fileBuffer = pcmData;
-            Logger.info('TX', `Audio ready. Size: ${Utils.formatBytes(pcmData.length)}`);
-            if (this.txBle.txCharacteristic) {
-                document.getElementById('btn-stream').disabled = false;
-            }
-        } catch (e) {
-            Logger.error('TX', `Failed: ${e.message}`);
+        // Just store the raw file, we will process it at stream-time
+        // so the sample rate dropdown is always respected.
+        this.rawAudioFile = file;
+        Logger.info('TX', `Audio file selected: ${file.name}. Press Start to stream.`);
+        if (this.txBle.txCharacteristic) {
+            document.getElementById('btn-stream').disabled = false;
+        } else {
+            Logger.info('TX', 'Connect to TX ESP32 first, then press Start.');
         }
     }
 
+    async processAudio(file, targetRate) {
+        Logger.info('TX', `Processing audio: ${file.name}. Converting to ${targetRate/1000}kHz 8-bit RAW PCM...`);
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        
+        // Render at 8000 Hz to satisfy the browser API minimum of 3000 Hz
+        const offlineCtx = new OfflineAudioContext(1, (audioBuffer.duration * 8000) + 1, 8000);
+        const source = offlineCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(offlineCtx.destination);
+        source.start();
+        
+        const renderedBuffer = await offlineCtx.startRendering();
+        
+        // Manually downsample to targetRate by taking every Nth sample
+        const step = Math.max(1, Math.floor(8000 / targetRate));
+        const length = Math.floor(renderedBuffer.length / step);
+        const pcmData = new Uint8Array(length);
+        const channels = renderedBuffer.getChannelData(0);
+        for(let i = 0; i < length; i++) {
+            let sample = channels[i * step] * 1.5; 
+            sample = Math.max(-1, Math.min(1, sample)); // Soft clip
+            pcmData[i] = Math.round((sample + 1) * 127.5);
+        }
+        return pcmData;
+    }
+
     async startTransmission() {
-        if (!this.fileBuffer || this.isTransmitting) return;
+        if (!this.rawAudioFile || this.isTransmitting) return;
         
         // Dynamically grab user settings from the UI
-        CONFIG.TRANSFER.CHUNK_SIZE = parseInt(document.getElementById('setting-chunk-size').value);
-        CONFIG.TRANSFER.BASE_TX_DELAY_MS = parseInt(document.getElementById('setting-tx-delay').value);
+        const chunkEl = document.getElementById('setting-chunk-size');
+        const delayEl = document.getElementById('setting-tx-delay');
+        const rateEl = document.getElementById('tx-setting-sample-rate');
+        CONFIG.TRANSFER.CHUNK_SIZE = chunkEl ? parseInt(chunkEl.value) : 120;
+        CONFIG.TRANSFER.BASE_TX_DELAY_MS = delayEl ? parseInt(delayEl.value) : 10;
+        const targetRate = rateEl ? parseInt(rateEl.value) : 4000;
+        
+        // Process audio RIGHT NOW with the CURRENT dropdown settings
+        try {
+            this.fileBuffer = await this.processAudio(this.rawAudioFile, targetRate);
+        } catch (e) {
+            Logger.error('TX', `Audio processing failed: ${e.message}`);
+            return;
+        }
         
         this.isTransmitting = true;
         document.getElementById('btn-stream').disabled = true;
@@ -165,7 +176,6 @@ class TransferManager {
 
         const CHUNK_SIZE = CONFIG.TRANSFER.CHUNK_SIZE;
         const totalChunks = Math.ceil(this.fileBuffer.length / CHUNK_SIZE);
-        const targetRate = parseInt(document.getElementById('tx-setting-sample-rate').value);
         Logger.info('TX', `Starting analog stream. Speed: ${targetRate}Hz | Chunks: ${totalChunks} | Delay: ${CONFIG.TRANSFER.BASE_TX_DELAY_MS}ms`);
 
         // Update TX ESP32 Timer Speed

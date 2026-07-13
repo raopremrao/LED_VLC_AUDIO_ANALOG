@@ -16,7 +16,7 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #define BUF_SIZE 16000 // Circular buffer
 uint8_t audioBuf[BUF_SIZE];
 volatile uint32_t head = 0;
-uint32_t tail = 0;
+volatile uint32_t tail = 0;
 volatile bool isRecording = false;
 uint8_t connectedClientId = 255;
 
