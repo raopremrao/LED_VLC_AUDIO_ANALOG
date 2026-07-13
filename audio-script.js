@@ -113,7 +113,7 @@ class TransferManager {
         const file = document.getElementById('file-input').files[0];
         if (!file) return;
 
-        Logger.info('TX', `Processing audio: ${file.name}. Converting to 4kHz 8-bit RAW PCM...`);
+        Logger.info('TX', `Processing audio: ${file.name}. Converting to 8kHz 8-bit RAW PCM...`);
         document.getElementById('btn-stream').disabled = true;
 
         try {
@@ -129,13 +129,13 @@ class TransferManager {
             
             const renderedBuffer = await offlineCtx.startRendering();
             
-            // Manually downsample from 8000 Hz to 4000 Hz by taking every 2nd sample
-            const length = Math.floor(renderedBuffer.length / 2);
+            // Convert exact 8000 Hz to 8-bit Unsigned PCM
+            const length = renderedBuffer.length;
             const pcmData = new Uint8Array(length);
             const channels = renderedBuffer.getChannelData(0);
             for(let i = 0; i < length; i++) {
-                // Boost the volume slightly (150%) but avoid the massive 500% clipping distortion!
-                let sample = channels[i * 2] * 1.5; 
+                // Boost the volume slightly (150%) but avoid clipping
+                let sample = channels[i] * 1.5; 
                 sample = Math.max(-1, Math.min(1, sample)); // Soft clip
                 pcmData[i] = Math.round((sample + 1) * 127.5);
             }
@@ -206,7 +206,7 @@ class TransferManager {
         
         Logger.info('RX', `Recording complete. Total: ${Utils.formatBytes(this.rxRawPCM.length)}`);
         if (this.rxRawPCM.length > 0) {
-            const wavData = this.wrapWav(this.rxRawPCM, 4000); // Create 4000 Hz WAV file
+            const wavData = this.wrapWav(this.rxRawPCM, 8000); // Create full 8000 Hz WAV file
             const blob = new Blob([wavData], { type: 'audio/wav' });
             Utils.downloadBlob(blob, 'analog_rx_continuous.wav');
             Logger.info('RX', 'WAV file downloaded.');
