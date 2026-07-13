@@ -8,7 +8,7 @@
 #define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
 const int LASER_PIN = 2; // Using Pin 2 with PWM (since we know it works perfectly!)
-const int SAMPLE_RATE = 2000; // Slowed down from 8000 to 2000 Hz!
+const int SAMPLE_RATE = 4000; // Web Audio API requires minimum 3000Hz, so we use 4000Hz!
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -85,8 +85,8 @@ void setup() {
     Serial.println("[INFO] Booting Analog VLC_TX (PWM on Pin 2)...");
     
     // Setup PWM on the laser pin (ESP32 Core v3.0+ API)
-    // 4 kHz frequency: Incredibly slow and safe for ANY basic transistor to switch!
-    ledcAttach(LASER_PIN, 4000, 8);
+    // 8 kHz frequency: Safe for basic transistors!
+    ledcAttach(LASER_PIN, 8000, 8);
     ledcWrite(LASER_PIN, IDLE_BIAS);
 
     BLEDevice::init("VLC_TX_Analog");

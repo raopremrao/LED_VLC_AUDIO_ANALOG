@@ -9,12 +9,12 @@
 #define CHARACTERISTIC_UUID_RX "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
 const int ADC_PIN = 34;
-const int SAMPLE_RATE = 2000; // Slowed down from 8000 to 2000 Hz!
+const int SAMPLE_RATE = 4000;
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
-#define BUF_SIZE 6000 // 3 seconds of audio at 2kHz
+#define BUF_SIZE 12000 // 3 seconds of audio at 4kHz
 uint8_t audioBuf[BUF_SIZE];
 volatile uint32_t head = 0;
 uint32_t tail = 0;
