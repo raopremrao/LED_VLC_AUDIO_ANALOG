@@ -54,8 +54,36 @@
                 <span class="status-badge" id="status-tx">Status: Disconnected</span>
 
                 <div class="file-input-wrapper">
-                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select audio file to stream (converted to 8kHz 8-bit Raw PCM):</label>
+                    <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:14px;">Select audio file to stream (converted to 4kHz 8-bit Raw PCM):</label>
                     <input type="file" id="file-input" accept="audio/*">
+                </div>
+
+                <div style="margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                    <h3 style="color: var(--primary); margin-top: 0; font-size: 16px;">Transmission Tuning</h3>
+                    
+                    <label style="display:block; margin-top: 10px; color:var(--text-muted); font-size:14px;">Audio Sample Rate (Speed):</label>
+                    <select id="setting-sample-rate" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
+                        <option value="2000">2000 Hz (Lowest Quality, Very Safe)</option>
+                        <option value="4000" selected>4000 Hz (Standard Walkie-Talkie)</option>
+                        <option value="8000">8000 Hz (High Quality, Fast Transistor Needed)</option>
+                    </select>
+
+                    <label style="display:block; margin-top: 15px; color:var(--text-muted); font-size:14px;">Chunk Size (Bytes per packet):</label>
+                    <select id="setting-chunk-size" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
+                        <option value="60">60 Bytes (Safe but slow)</option>
+                        <option value="120" selected>120 Bytes (Default 30ms @ 4kHz)</option>
+                        <option value="240">240 Bytes (Requires high BLE MTU)</option>
+                    </select>
+
+                    <label style="display:block; margin-top: 15px; color:var(--text-muted); font-size:14px;">TX Delay (Wait between packets):</label>
+                    <select id="setting-tx-delay" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
+                        <option value="0">0ms (Maximum Speed)</option>
+                        <option value="5">5ms (Very fast, fills ESP buffer)</option>
+                        <option value="10" selected>10ms (Optimal)</option>
+                        <option value="20">20ms (Slower)</option>
+                        <option value="30">30ms (Might cause stuttering)</option>
+                        <option value="50">50ms (Guaranteed starvation hiss)</option>
+                    </select>
                 </div>
 
                 <button class="btn" id="btn-stream" disabled style="width: 100%;">Start Analog Stream</button>

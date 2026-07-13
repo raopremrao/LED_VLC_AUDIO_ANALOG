@@ -62,6 +62,13 @@ class MyRxCallbacks: public BLECharacteristicCallbacks {
             if (cmdStr == "CMD:STOP") {
                 isPlaying = false;
             }
+            if (cmdStr.startsWith("CMD:RATE:")) {
+                int rate = cmdStr.substring(9).toInt();
+                if (rate > 0) {
+                    timerAlarm(timer, 1000000 / rate, true, 0);
+                    Serial.printf("[INFO] Hardware Timer Speed updated to %d Hz!\n", rate);
+                }
+            }
             return;
         }
 

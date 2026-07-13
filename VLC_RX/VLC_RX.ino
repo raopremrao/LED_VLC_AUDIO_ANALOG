@@ -65,6 +65,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 isRecording = false;
                 Serial.println("[INFO] Stopped Wi-Fi streaming.");
             }
+            else if (strncmp((const char*)payload, "CMD:RATE:", 9) == 0) {
+                int rate = atoi((const char*)(payload + 9));
+                if (rate > 0) {
+                    timerAlarm(timer, 1000000 / rate, true, 0);
+                    Serial.printf("[INFO] Hardware Timer Speed updated to %d Hz!\n", rate);
+                }
+            }
             break;
         case WStype_BIN:
             break;
