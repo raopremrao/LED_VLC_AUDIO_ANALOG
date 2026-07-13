@@ -113,7 +113,7 @@ class TransferManager {
         const file = document.getElementById('file-input').files[0];
         if (!file) return;
 
-        const targetRate = parseInt(document.getElementById('setting-sample-rate').value);
+        const targetRate = parseInt(document.getElementById('tx-setting-sample-rate').value);
         Logger.info('TX', `Processing audio: ${file.name}. Converting to ${targetRate/1000}kHz 8-bit RAW PCM...`);
         document.getElementById('btn-stream').disabled = true;
 
@@ -165,7 +165,7 @@ class TransferManager {
 
         const CHUNK_SIZE = CONFIG.TRANSFER.CHUNK_SIZE;
         const totalChunks = Math.ceil(this.fileBuffer.length / CHUNK_SIZE);
-        const targetRate = parseInt(document.getElementById('setting-sample-rate').value);
+        const targetRate = parseInt(document.getElementById('tx-setting-sample-rate').value);
         Logger.info('TX', `Starting analog stream. Speed: ${targetRate}Hz | Chunks: ${totalChunks} | Delay: ${CONFIG.TRANSFER.BASE_TX_DELAY_MS}ms`);
 
         // Update TX ESP32 Timer Speed
@@ -198,7 +198,7 @@ class TransferManager {
     async startRxRecording() {
         this.rxRawPCM = new Uint8Array(0);
         this.isRecording = true;
-        const targetRate = parseInt(document.getElementById('setting-sample-rate').value);
+        const targetRate = parseInt(document.getElementById('rx-setting-sample-rate').value);
         document.getElementById('btn-start-rx').disabled = true;
         document.getElementById('btn-stop-rx').disabled = false;
         this.updateUI('rx-buffer-status', `Recording Started...`);
@@ -221,7 +221,7 @@ class TransferManager {
         
         Logger.info('RX', `Recording complete. Total: ${Utils.formatBytes(this.rxRawPCM.length)}`);
         if (this.rxRawPCM.length > 0) {
-            const targetRate = parseInt(document.getElementById('setting-sample-rate').value);
+            const targetRate = parseInt(document.getElementById('rx-setting-sample-rate').value);
             const wavData = this.wrapWav(this.rxRawPCM, targetRate); // Create WAV at selected speed
             const blob = new Blob([wavData], { type: 'audio/wav' });
             Utils.downloadBlob(blob, 'analog_rx_continuous.wav');

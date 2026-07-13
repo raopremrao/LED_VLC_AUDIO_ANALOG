@@ -62,7 +62,7 @@
                     <h3 style="color: var(--primary); margin-top: 0; font-size: 16px;">Transmission Tuning</h3>
                     
                     <label style="display:block; margin-top: 10px; color:var(--text-muted); font-size:14px;">Audio Sample Rate (Speed):</label>
-                    <select id="setting-sample-rate" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
+                    <select id="tx-setting-sample-rate" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
                         <option value="2000">2000 Hz (Lowest Quality, Very Safe)</option>
                         <option value="4000" selected>4000 Hz (Standard Walkie-Talkie)</option>
                         <option value="8000">8000 Hz (High Quality, Fast Transistor Needed)</option>
@@ -97,6 +97,16 @@
                 <div style="margin: 15px 0;">
                     <input type="text" id="rx-ip-input" placeholder="RX ESP32 IP (e.g. 192.168.1.10)" style="width: 100%; padding: 10px; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #444;">
                     <button class="btn" id="btn-conn-rx" style="width: 100%;">Connect RX via WiFi</button>
+                </div>
+
+                <div style="margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                    <h3 style="color: var(--primary); margin-top: 0; font-size: 16px;">Receiver Tuning</h3>
+                    <label style="display:block; margin-top: 10px; color:var(--text-muted); font-size:14px;">Audio Sample Rate (Must match TX!):</label>
+                    <select id="rx-setting-sample-rate" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; margin-top: 5px;">
+                        <option value="2000">2000 Hz</option>
+                        <option value="4000" selected>4000 Hz</option>
+                        <option value="8000">8000 Hz</option>
+                    </select>
                 </div>
 
                 <div style="margin-top: 20px; text-align: center;">
